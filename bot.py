@@ -12,7 +12,11 @@ app = Flask(__name__)
 
 DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
 PORT = int(os.getenv("PORT", 8080))
-
+try:
+    PLAYERS_MAP: dict = json.loads(os.getenv("PLAYERS_MAP", "{}"))
+except json.JSONDecodeError:
+    print("[WARN] PLAYERS_MAP no .env tem formato inválido. Usando mapa vazio.")
+    PLAYERS_MAP = {}
 GITLAB_BASE = (
     "https://gitlab.com/cable-mc/cobblemon/-/raw/main"
     "/common/src/main/resources/data/cobblemon/species"
@@ -101,6 +105,13 @@ def fmt_move(move_id: str) -> str:
     name = move_id.split(":")[-1]
     return name.replace("_", " ").title()
 
+def format_coordinates(description: str) -> str:
+    """Reformata coordenadas na descrição de '(-4864, 95, -3081)' para 'X: -4864 | Y: 95 | Z: -3081'."""
+    def replacer(match):
+        x, y, z = match.group(1), match.group(2), match.group(3)
+        return f"X: {x} | Y: {y} | Z: {z}"
+ 
+    return re.sub(r"\((-?\d+),\s*(-?\d+),\s*(-?\d+)\)", replacer, description)
 
 async def fetch_pokeapi_data(dex_number: int, session: aiohttp.ClientSession) -> dict:
     """Busca dados gerais, espécie e cadeia de evolução na PokeAPI."""
@@ -144,8 +155,6 @@ async def fetch_cobblemon_species(
         async with session.get(url) as resp:
             if resp.status == 200:
                 data = await resp.json(content_type=None)
-                print("[DEBUG] cobblemon moves sample:", json.dumps(data.get("moves", [])[:3], indent=2))
-                print("[DEBUG] cobblemon drops sample:", json.dumps(data.get("drops", {}), indent=2))
                 print(f"[OK] Species do Cobblemon carregado: {pokemon_name}")
                 return data
             print(f"[WARN] Cobblemon species não encontrado ({resp.status}): {url}")
@@ -199,21 +208,17 @@ def parse_moveset(cobblemon_data: dict, max_moves: int = 10) -> str:
     for entry in learnset:
         # Formato string: "7,cobblemon:ember"
         if isinstance(entry, str):
-            parts = entry.split(",", 1)
+            parts = entry.split(":", 1)
             if len(parts) == 2:
-                try:
-                    level = int(parts[0])
-                    move_name = fmt_move(parts[1])
-                    level_moves.append((level, move_name))
-                except ValueError:
-                    pass
-            continue
+               level_str, move_id = parts
+               if level_str.isdigit():
+                   level_moves.append((int(level_str), fmt_move(move_id)))
 
         # Formato dict: {"move": "...", "methods": [...]}
-        if isinstance(entry, dict):
+        elif isinstance(entry, dict):
             move_name = fmt_move(entry.get("move", "?"))
             for method in entry.get("methods", []):
-                if isinstance(method, dict) and method.get("type") == "level_up":
+                if  method.get("type") == "level_up":
                     level = method.get("level", 0)
                     level_moves.append((level, move_name))
                     break
@@ -224,6 +229,25 @@ def parse_moveset(cobblemon_data: dict, max_moves: int = 10) -> str:
     level_moves.sort(key=lambda x: x[0])
     return "\n".join(f"• Lv.{lvl} {move}" for lvl, move in level_moves[:max_moves])
 
+def parse_nature(cobblemon_data: dict) -> str:
+    nature = cobblemon_data.get("nature")
+    return nature.replace("_", " ").title() if nature else "N/A"
+
+def parse_ability(cobblemon_data: dict) -> str:
+    ability = cobblemon_data.get("ability")
+    return ability.replace("_", " ").title() if ability else "N/A"
+
+def parse_nearest_player(cobblemon_data: dict) -> str:
+    nearest = cobblemon_data.get("nearest_player")
+    raw_player = fields_map.get("nearest player", fields_map.get("nearest_player", ""))
+    if raw_player and raw_player != "N/A":
+        discord_id = PLAYERS_MAP.get(raw_player.strip())
+        if discord_id:
+            return f"<@{discord_id}>"
+        else:
+            return raw_player
+    else:
+        return "N/A"
 
 def get_english_description(species: dict) -> str:
     for entry in species.get("flavor_text_entries", []):
@@ -402,7 +426,7 @@ async def send_enriched_webhook(payload: dict):
     is_shiny = False
 
     if embeds:
-        description = embeds[0].get("description", "")
+        description = format_coordinates(embeds[0].get("description", ""))
         title = embeds[0].get("title", "")
         fields = embeds[0].get("fields", [])
         is_shiny = "shiny" in title.lower()
@@ -423,14 +447,14 @@ async def send_enriched_webhook(payload: dict):
                 if match:
                     dex_number = int(match.group(1))
                     break
-        mod_fields = embeds[0].get("fields", [])
-        fields_map = {
-            f.get("name", "").replace("*", "").strip().lower(): f.get("value", "N/A")
-            for f in mod_fields
-        }              
-        nature_display         = fields_map.get("nature", "N/A")
-        ability_display        = fields_map.get("ability", "N/A")
-        nearest_player_display = fields_map.get("nearest player", fields_map.get("nearest_player", "N/A"))
+        # mod_fields = embeds[0].get("fields", [])
+        # fields_map = {
+        #     f.get("name", "").replace("*", "").strip().lower(): f.get("value", "N/A")
+        #     for f in mod_fields
+        # }              
+        # nature_display         = fields_map.get("nature", "N/A")
+        # ability_display        = fields_map.get("ability", "N/A")
+        # nearest_player_display = fields_map.get("nearest player", fields_map.get("nearest_player", "N/A"))
 
     if not dex_number:
         print("[WARN] Dex number não encontrado. Encaminhando payload original.")
@@ -468,9 +492,9 @@ async def send_enriched_webhook(payload: dict):
     # Cobblemon GitLab
     drops_display   = parse_drops(cobblemon_data)
     moveset_display = parse_moveset(cobblemon_data)
-    nature_display = "N/A"
-    ability_display = "N/A"
-    nearest_player_display = "N/A"
+    nature_display = parse_nature(cobblemon_data)
+    ability_display = parse_ability(cobblemon_data)
+    nearest_player_display = parse_nearest_player(cobblemon_data)
 
     color = get_embed_color(types, is_shiny)
     artwork_url = (
