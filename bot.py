@@ -374,24 +374,28 @@ async def send_enriched_webhook(payload: dict):
     is_shiny = False
 
     if embeds:
-        description = embeds[0].get("description", "")
-        title = embeds[0].get("title", "")
+    description = embeds[0].get("description", "")
+    title = embeds[0].get("title", "")
+    fields = embeds[0].get("fields", [])
 
-        is_shiny = "shiny" in title.lower()
+    is_shiny = "shiny" in title.lower()
 
-        skip = {"a", "an", "shiny", "legendary", "mythical", "ultrabeast",
-                "paradox", "spawned", "in", "biome!", "the", ""}
-        for part in title.replace("*", "").replace("✨", "").split():
-            if part.lower() not in skip:
-                pokemon_name_raw = part.lower()
+    # Nome do Pokémon vindo do title
+    skip = {"a", "an", "shiny", "legendary", "mythical", "ultrabeast",
+            "paradox", "spawned", "in", "biome!", "the", "ultra", "rare",
+            "common", "uncommon", ""}
+    for part in title.replace("*", "").replace("✨", "").split():
+        if part.lower() not in skip:
+            pokemon_name_raw = part.lower()
+            break
+
+    # Dex number vindo dos fields
+    for field in fields:
+        if field.get("name", "").lower() == "dex":
+            match = re.search(r"(\d+)", field.get("value", ""))
+            if match:
+                dex_number = int(match.group(1))
                 break
-
-        for line in description.split("\n"):
-            if "dex" in line.lower() or "#" in line:
-                match = re.search(r"#(\d+)", line)
-                if match:
-                    dex_number = int(match.group(1))
-                    break
 
     if not dex_number:
         print("[WARN] Dex number não encontrado. Encaminhando payload original.")
@@ -499,7 +503,7 @@ def receive_webhook():
     payload = request.get_json(silent=True)
     if not payload:
         return jsonify({"error": "Payload inválido"}), 400
-        
+
     print("[DEBUG] Payload recebido:")
     print(json.dumps(payload, indent=2, ensure_ascii=False))
     asyncio.run(send_enriched_webhook(payload))
