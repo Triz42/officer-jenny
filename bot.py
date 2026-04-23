@@ -153,7 +153,6 @@ async def fetch_cobblemon_species(
 
 
 def parse_drops(cobblemon_data: dict) -> str:
-    """Extrai e formata os drops do JSON de espécie do Cobblemon."""
     drops = cobblemon_data.get("drops", {})
     entries = drops.get("entries", [])
     if not entries:
@@ -164,9 +163,17 @@ def parse_drops(cobblemon_data: dict) -> str:
         item = fmt_item(entry.get("item", "?"))
         pct = entry.get("percentage", 100)
 
-        qty_range = entry.get("quantityRange", {})
-        qty_min = qty_range.get("min", entry.get("quantity", 1))
-        qty_max = qty_range.get("max", qty_min)
+        qty_range = entry.get("quantityRange")
+
+        # quantityRange pode ser string "1-3", dict {"min":1,"max":3}, ou ausente
+        if isinstance(qty_range, str) and "-" in qty_range:
+            parts = qty_range.split("-")
+            qty_min, qty_max = int(parts[0]), int(parts[1])
+        elif isinstance(qty_range, dict):
+            qty_min = qty_range.get("min", entry.get("quantity", 1))
+            qty_max = qty_range.get("max", qty_min)
+        else:
+            qty_min = qty_max = entry.get("quantity", 1)
 
         qty_str = f"x{qty_min}" if qty_min == qty_max else f"x{qty_min}–{qty_max}"
         lines.append(f"• {item} {qty_str} ({pct}%)")
