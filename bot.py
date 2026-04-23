@@ -423,6 +423,14 @@ async def send_enriched_webhook(payload: dict):
                 if match:
                     dex_number = int(match.group(1))
                     break
+        mod_fields = embeds[0].get("fields", [])
+        fields_map = {
+            f.get("name", "").replace("*", "").strip().lower(): f.get("value", "N/A")
+            for f in mod_fields
+        }              
+        nature_display         = fields_map.get("nature", "N/A")
+        ability_display        = fields_map.get("ability", "N/A")
+        nearest_player_display = fields_map.get("nearest player", fields_map.get("nearest_player", "N/A"))
 
     if not dex_number:
         print("[WARN] Dex number não encontrado. Encaminhando payload original.")
@@ -460,6 +468,9 @@ async def send_enriched_webhook(payload: dict):
     # Cobblemon GitLab
     drops_display   = parse_drops(cobblemon_data)
     moveset_display = parse_moveset(cobblemon_data)
+    nature_display = "N/A"
+    ability_display = "N/A"
+    nearest_player_display = "N/A"
 
     color = get_embed_color(types, is_shiny)
     artwork_url = (
@@ -504,6 +515,21 @@ async def send_enriched_webhook(payload: dict):
                 "name":   "💰 Drops",
                 "value":  drops_display,
                 "inline": True,
+            },
+            {
+                "name":   "🌿 Natureza",
+                "value":  nature_display,
+                "inline": True,
+            },
+            {
+                "name":   "✴️ Habilidade",
+                "value":  ability_display,
+                "inline": True,
+            },
+            {
+                "name":   "👤 Jogador mais próximo",
+                "value":  nearest_player_display,
+                "inline": False,
             },
         ],
         "footer":    original_embed.get("footer", {}),
