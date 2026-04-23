@@ -184,26 +184,45 @@ def parse_drops(cobblemon_data: dict) -> str:
 
 
 def parse_moveset(cobblemon_data: dict, max_moves: int = 10) -> str:
-    """Extrai os primeiros moves level-up do learnset do Cobblemon."""
+    """Extrai os primeiros moves level-up do learnset do Cobblemon.
+    
+    Suporta dois formatos:
+      - String: "1,cobblemon:scratch"
+      - Dict:   {"move": "cobblemon:scratch", "methods": [{"type": "level_up", "level": 1}]}
+    """
     learnset = cobblemon_data.get("moves", [])
     if not learnset:
         return "Moveset não disponível."
 
     level_moves = []
+
     for entry in learnset:
-        move_name = fmt_move(entry.get("move", "?"))
-        for method in entry.get("methods", []):
-            if method.get("type") == "level_up":
-                level = method.get("level", 0)
-                level_moves.append((level, move_name))
-                break
+        # Formato string: "7,cobblemon:ember"
+        if isinstance(entry, str):
+            parts = entry.split(",", 1)
+            if len(parts) == 2:
+                try:
+                    level = int(parts[0])
+                    move_name = fmt_move(parts[1])
+                    level_moves.append((level, move_name))
+                except ValueError:
+                    pass
+            continue
+
+        # Formato dict: {"move": "...", "methods": [...]}
+        if isinstance(entry, dict):
+            move_name = fmt_move(entry.get("move", "?"))
+            for method in entry.get("methods", []):
+                if isinstance(method, dict) and method.get("type") == "level_up":
+                    level = method.get("level", 0)
+                    level_moves.append((level, move_name))
+                    break
 
     if not level_moves:
         return "Moveset não disponível."
 
     level_moves.sort(key=lambda x: x[0])
-    level_moves = level_moves[:max_moves]
-    return "\n".join(f"• Lv.{lvl} {move}" for lvl, move in level_moves)
+    return "\n".join(f"• Lv.{lvl} {move}" for lvl, move in level_moves[:max_moves])
 
 
 def get_english_description(species: dict) -> str:
