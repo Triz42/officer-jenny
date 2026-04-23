@@ -2,6 +2,7 @@ import os
 import re
 import asyncio
 import aiohttp
+import json
 from flask import Flask, request, jsonify
 from dotenv import load_dotenv
 
@@ -398,6 +399,8 @@ async def send_enriched_webhook(payload: dict):
             await session.post(DISCORD_WEBHOOK_URL, json=payload)
         return
 
+        
+
     async with aiohttp.ClientSession() as session:
         pokeapi_data = await fetch_pokeapi_data(dex_number, session)
 
@@ -496,6 +499,9 @@ def receive_webhook():
     payload = request.get_json(silent=True)
     if not payload:
         return jsonify({"error": "Payload inválido"}), 400
+        
+    print("[DEBUG] Payload recebido:")
+    print(json.dumps(payload, indent=2, ensure_ascii=False))
     asyncio.run(send_enriched_webhook(payload))
     return jsonify({"status": "ok"}), 200
 
