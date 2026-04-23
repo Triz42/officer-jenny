@@ -229,12 +229,20 @@ def parse_moveset(cobblemon_data: dict, max_moves: int = 10) -> str:
     level_moves.sort(key=lambda x: x[0])
     return "\n".join(f"• Lv.{lvl} {move}" for lvl, move in level_moves[:max_moves])
 
-def parse_nature(cobblemon_data: dict) -> str:
-    nature = cobblemon_data.get("nature")
+def parse_nature(fields: list) -> str:
+    fields_map = {
+        f.get("name", "").replace("*", "").strip().lower(): f.get("value", "N/A")
+        for f in fields
+    }
+    nature = fields_map.get("nature", "N/A")
     return nature.replace("_", " ").title() if nature else "N/A"
 
-def parse_ability(cobblemon_data: dict) -> str:
-    ability = cobblemon_data.get("ability")
+def parse_ability(fields: list) -> str:
+    fields_map = {
+        f.get("name", "").replace("*", "").strip().lower(): f.get("value", "N/A")
+        for f in fields
+    }
+    ability = fields_map.get("ability", "N/A")
     return ability.replace("_", " ").title() if ability else "N/A"
 
 def parse_nearest_player(fields: list) -> str:
@@ -485,8 +493,8 @@ async def send_enriched_webhook(payload: dict):
     # Cobblemon GitLab
     drops_display   = parse_drops(cobblemon_data)
     moveset_display = parse_moveset(cobblemon_data)
-    nature_display = parse_nature(cobblemon_data)
-    ability_display = parse_ability(cobblemon_data)
+    nature_display = parse_nature(fields)
+    ability_display = parse_ability(fields)
     nearest_player_display = parse_nearest_player(fields)
 
     color = get_embed_color(types, is_shiny)
