@@ -144,6 +144,8 @@ async def fetch_cobblemon_species(
         async with session.get(url) as resp:
             if resp.status == 200:
                 data = await resp.json(content_type=None)
+                print("[DEBUG] cobblemon moves sample:", json.dumps(data.get("moves", [])[:3], indent=2))
+                print("[DEBUG] cobblemon drops sample:", json.dumps(data.get("drops", {}), indent=2))
                 print(f"[OK] Species do Cobblemon carregado: {pokemon_name}")
                 return data
             print(f"[WARN] Cobblemon species não encontrado ({resp.status}): {url}")
