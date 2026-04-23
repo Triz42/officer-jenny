@@ -237,17 +237,18 @@ def parse_ability(cobblemon_data: dict) -> str:
     ability = cobblemon_data.get("ability")
     return ability.replace("_", " ").title() if ability else "N/A"
 
-def parse_nearest_player(cobblemon_data: dict) -> str:
-    nearest = cobblemon_data.get("nearest_player")
-    raw_player = fields_map.get("nearest player", fields_map.get("nearest_player", ""))
-    if raw_player and raw_player != "N/A":
-        discord_id = PLAYERS_MAP.get(raw_player.strip())
+def parse_nearest_player(fields: list) -> str:
+    fields_map = {
+        f.get("name", "").replace("*", "").strip().lower(): f.get("value", "N/A")
+        for f in fields
+    }
+    nearest = fields_map.get("nearest player", fields_map.get("nearest_player", "N/A"))
+    if nearest and nearest != "N/A":
+        discord_id = PLAYERS_MAP.get(nearest.strip())
         if discord_id:
             return f"<@{discord_id}>"
-        else:
-            return raw_player
-    else:
-        return "N/A"
+        return nearest
+    return "N/A"
 
 def get_english_description(species: dict) -> str:
     for entry in species.get("flavor_text_entries", []):
@@ -447,14 +448,6 @@ async def send_enriched_webhook(payload: dict):
                 if match:
                     dex_number = int(match.group(1))
                     break
-        # mod_fields = embeds[0].get("fields", [])
-        # fields_map = {
-        #     f.get("name", "").replace("*", "").strip().lower(): f.get("value", "N/A")
-        #     for f in mod_fields
-        # }              
-        # nature_display         = fields_map.get("nature", "N/A")
-        # ability_display        = fields_map.get("ability", "N/A")
-        # nearest_player_display = fields_map.get("nearest player", fields_map.get("nearest_player", "N/A"))
 
     if not dex_number:
         print("[WARN] Dex number não encontrado. Encaminhando payload original.")
@@ -494,7 +487,7 @@ async def send_enriched_webhook(payload: dict):
     moveset_display = parse_moveset(cobblemon_data)
     nature_display = parse_nature(cobblemon_data)
     ability_display = parse_ability(cobblemon_data)
-    nearest_player_display = parse_nearest_player(cobblemon_data)
+    nearest_player_display = parse_nearest_player(fields)
 
     color = get_embed_color(types, is_shiny)
     artwork_url = (
