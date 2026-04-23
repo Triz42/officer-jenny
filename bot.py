@@ -507,5 +507,4 @@ def health():
 
 if __name__ == "__main__":
     print(f"[BOT] Rodando na porta {PORT}...")
-    print(f"[BOT] Aponte o webhookURL do mod para: http://localhost:{PORT}/webhook")
     app.run(host="0.0.0.0", port=PORT)
