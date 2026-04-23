@@ -388,13 +388,13 @@ async def send_enriched_webhook(payload: dict):
                 pokemon_name_raw = part.lower()
                 break
 
-    # Dex number vindo dos fields
-    for field in fields:
-        if field.get("name", "").lower() == "dex":
-            match = re.search(r"(\d+)", field.get("value", ""))
-            if match:
-                dex_number = int(match.group(1))
-                break
+        # Dex number vindo dos fields
+        for field in fields:
+            if field.get("name", "").lower() == "dex":
+                match = re.search(r"(\d+)", field.get("value", ""))
+                if match:
+                    dex_number = int(match.group(1))
+                    break
 
     if not dex_number:
         print("[WARN] Dex number não encontrado. Encaminhando payload original.")
