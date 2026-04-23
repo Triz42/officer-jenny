@@ -186,8 +186,26 @@ def parse_drops(cobblemon_data: dict) -> str:
         else:
             qty_min = qty_max = entry.get("quantity", 1)
 
+        # quantityRange "0-N" significa que o item pode não dropar:
+        # a chance real de obter o item é pct * N/(N+1)
+        if qty_min == 0 and qty_max > 0:
+            pct = round(pct * qty_max / (qty_max + 1), 1)
+            qty_min = 1
+
         qty_str = f"x{qty_min}" if qty_min == qty_max else f"x{qty_min}–{qty_max}"
-        lines.append(f"• {item} {qty_str} ({pct}%)")
+
+        if pct >= 100:
+            rarity = "⚪"
+        elif pct >= 60:
+            rarity = "🟢"
+        elif pct >= 30:
+            rarity = "🔵"
+        elif pct >= 10:
+            rarity = "🟣"
+        else:
+            rarity = "🔴"
+
+        lines.append(f"{rarity} {item:<20} {qty_str:<6} {pct}%")
 
     return "\n".join(lines)
 
@@ -244,6 +262,32 @@ def parse_ability(fields: list) -> str:
     }
     ability = fields_map.get("ability", "N/A")
     return ability.replace("_", " ").title() if ability else "N/A"
+
+IV_LABELS = ["HP", "Atk", "Def", "SpA", "SpD", "Spe"]
+
+def parse_ivs(fields: list) -> str:
+    fields_map = {
+        f.get("name", "").replace("*", "").strip().lower(): f.get("value", "")
+        for f in fields
+    }
+    raw = fields_map.get("ivs", "")
+    match = re.search(r"\(?([\d/]+)\)?", raw)
+    if not match:
+        return "N/A"
+
+    values = match.group(1).split("/")
+    if len(values) != 6:
+        return raw
+
+    def iv_emoji(v: int) -> str:
+        if v == 31:  return "⭐"
+        if v >= 26:  return "🟢"
+        if v >= 16:  return "🟡"
+        if v >= 6:   return "🟠"
+        return "🔴"
+
+    parts = [f"{iv_emoji(int(v))} {label}: {v}" for label, v in zip(IV_LABELS, values)]
+    return "\n".join([" | ".join(parts[:3]), " | ".join(parts[3:])])
 
 def parse_nearest_player(fields: list) -> str:
     fields_map = {
@@ -495,6 +539,7 @@ async def send_enriched_webhook(payload: dict):
     moveset_display = parse_moveset(cobblemon_data)
     nature_display = parse_nature(fields)
     ability_display = parse_ability(fields)
+    ivs_display = parse_ivs(fields)
     nearest_player_display = parse_nearest_player(fields)
 
     color = get_embed_color(types, is_shiny)
@@ -507,7 +552,7 @@ async def send_enriched_webhook(payload: dict):
 
     enriched_embed = {
         "title":       original_embed.get("title", f"A {pokemon_name_raw.capitalize()} spawned!"),
-        "description": original_embed.get("description", ""),
+        "description": format_coordinates(original_embed.get("description", "")),
         "color":       color,
         "thumbnail":   {"url": artwork_url},
         "fields": [
@@ -523,7 +568,7 @@ async def send_enriched_webhook(payload: dict):
             },
             {
                 "name":   "⚾ Catch Rate",
-                "value":  f"{capture_rate}/255 ({capture_pct}%)",
+                "value":  f"{capture_pct}%",
                 "inline": True,
             },
             {
@@ -550,6 +595,11 @@ async def send_enriched_webhook(payload: dict):
                 "name":   "✴️ Habilidade",
                 "value":  ability_display,
                 "inline": True,
+            },
+            {
+                "name":   "🧬 IVs",
+                "value":  ivs_display,
+                "inline": False,
             },
             {
                 "name":   "👤 Jogador mais próximo",
