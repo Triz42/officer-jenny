@@ -471,6 +471,30 @@ def get_embed_color(types: list, is_shiny: bool) -> int:
     return 10329495
 
 
+def build_jenny_content(pokemon_name: str, is_shiny: bool, is_legendary: bool, is_ultra_rare: bool) -> str:
+    name = pokemon_name.capitalize()
+    tags = []
+    if is_shiny:      tags.append("shiny")
+    if is_legendary:  tags.append("lendário")
+    if is_ultra_rare: tags.append("ultra raro")
+
+    if not tags:
+        return f"Pokémon detectado. Aqui é a Officer Jenny — {name} localizado. Fiquem alertas."
+
+    if len(tags) == 1:
+        messages = {
+            "shiny":      f"✨ ALERTA! Officer Jenny aqui — {name} brilhante localizado! Não percam!",
+            "lendário":   f"🚨 EMERGÊNCIA! Officer Jenny no comando — {name} lendário detectado na área!",
+            "ultra raro": f"⚠️ Aviso de campo! Officer Jenny aqui — {name} ultra raro avistado!",
+        }
+        return messages[tags[0]]
+
+    emojis = {"shiny": "✨", "lendário": "🚨", "ultra raro": "⚠️"}
+    prefix = " ".join(emojis[t] for t in tags)
+    tags_str = " + ".join(t.upper() for t in tags)
+    return f"{prefix} ALERTA MÁXIMO! Officer Jenny no comando — {name} {tags_str} confirmado! Repito, {tags_str}!"
+
+
 async def send_enriched_webhook(payload: dict):
     """Monta e envia o embed enriquecido para o Discord."""
     dex_number = None
@@ -478,11 +502,17 @@ async def send_enriched_webhook(payload: dict):
     pokemon_name_raw = "unknown"
     is_shiny = False
 
+    is_legendary = False
+    is_ultra_rare = False
+
     if embeds:
         description = format_coordinates(embeds[0].get("description", ""))
         title = embeds[0].get("title", "")
         fields = embeds[0].get("fields", [])
-        is_shiny = "shiny" in title.lower()
+        title_lower = title.lower()
+        is_shiny     = "shiny" in title_lower
+        is_legendary = "legendary" in title_lower or "mythical" in title_lower
+        is_ultra_rare = "ultra rare" in title_lower or "ultrabeast" in title_lower
 
         # Nome do Pokémon vindo do title
         skip = {"a", "an", "shiny", "legendary", "mythical", "ultrabeast",
@@ -612,9 +642,9 @@ async def send_enriched_webhook(payload: dict):
     }
 
     enriched_payload = {
-        "content":    payload.get("content", ""),
-        "username":   payload.get("username", "Cobblemon Alerts"),
-        "avatar_url": payload.get("avatar_url", ""),
+        "content":    build_jenny_content(pokemon_name_raw, is_shiny, is_legendary, is_ultra_rare),
+        "username":   "Officer Jenny",
+        "avatar_url": "https://pbs.twimg.com/profile_images/873972805016182785/fF05y2PW_400x400.jpg",
         "embeds":     [enriched_embed],
     }
 
