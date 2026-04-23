@@ -374,20 +374,19 @@ async def send_enriched_webhook(payload: dict):
     is_shiny = False
 
     if embeds:
-    description = embeds[0].get("description", "")
-    title = embeds[0].get("title", "")
-    fields = embeds[0].get("fields", [])
+        description = embeds[0].get("description", "")
+        title = embeds[0].get("title", "")
+        fields = embeds[0].get("fields", [])
+        is_shiny = "shiny" in title.lower()
 
-    is_shiny = "shiny" in title.lower()
-
-    # Nome do Pokémon vindo do title
-    skip = {"a", "an", "shiny", "legendary", "mythical", "ultrabeast",
-            "paradox", "spawned", "in", "biome!", "the", "ultra", "rare",
-            "common", "uncommon", ""}
-    for part in title.replace("*", "").replace("✨", "").split():
-        if part.lower() not in skip:
-            pokemon_name_raw = part.lower()
-            break
+        # Nome do Pokémon vindo do title
+        skip = {"a", "an", "shiny", "legendary", "mythical", "ultrabeast",
+                "paradox", "spawned", "in", "biome!", "the", "ultra", "rare",
+                "common", "uncommon", ""}
+        for part in title.replace("*", "").replace("✨", "").split():
+            if part.lower() not in skip:
+                pokemon_name_raw = part.lower()
+                break
 
     # Dex number vindo dos fields
     for field in fields:
